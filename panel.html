@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Scraping CE</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Web Scraper</h1>
+      <p class="subtitle">Select elements • Define selectors • Scrape data • Export</p>
+    </div>
+    
+    <!-- Selector Management Section -->
+    <div class="section">
+      <h3>📋 Define Data to Scrape</h3>
+      
+      <!-- Manual Selector Input -->
+      <div class="selector-input-group">
+        <label for="fieldName">Field Name:</label>
+        <input 
+          type="text" 
+          id="fieldName" 
+          placeholder="e.g., Product Name">
+        
+        <label for="cssSelector">CSS Selector:</label>
+        <input 
+          type="text" 
+          id="cssSelector" 
+          placeholder="e.g., .product-title">
+        
+        <button id="addSelectorBtn" class="btn btn-secondary">+ Add Selector</button>
+      </div>
+
+      <!-- Visual Picker -->
+      <div class="picker-section">
+        <button id="togglePickerBtn" class="btn btn-primary">
+          🎯 Pick Element on Page
+        </button>
+        <p class="hint" id="pickerHint" style="display: none;">
+          ✓ Picker active - click an element on the website to auto-detect its selector
+        </p>
+      </div>
+    </div>
+
+    <!-- Selectors List -->
+    <div class="section">
+      <h3>📌 Active Selectors</h3>
+      <ul id="selectorsList" class="selectors-list">
+        <li class="empty">No selectors added yet</li>
+      </ul>
+    </div>
+
+    <!-- Data Preview Section -->
+    <div class="section">
+      <h3>🔍 Scrape Data</h3>
+      <button id="scrapeBtn" class="btn btn-success">Start Scraping</button>
+      <div id="previewContainer" class="preview-container">
+        <p class="empty">No data scraped yet</p>
+      </div>
+    </div>
+
+    <!-- Export Section -->
+    <div class="section">
+      <h3>💾 Export</h3>
+      <div class="button-row">
+        <button id="exportJsonBtn" class="btn btn-export">📄 JSON</button>
+        <button id="exportXlsxBtn" class="btn btn-export">📊 XLSX</button>
+        <button id="clearDataBtn" class="btn btn-danger">🗑️ Clear</button>
+      </div>
+    </div>
+
+    <!-- Status Message -->
+    <div id="statusMessage" class="status-message"></div>
+  </div>
+
+  <script src="panel.js"></script>
+</body>
+</html>

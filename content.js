@@ -123,20 +123,20 @@ function enablePicker() {
   pickerActive = true;
   document.body.style.cursor = 'crosshair';
   
-  // Add overlay styles
+  // Add overlay styles with unique namespaced class names to avoid conflicts
   const style = document.createElement('style');
-  style.id = 'picker-styles';
+  style.id = 'scraping-ce-picker-styles';
   style.textContent = `
-    .picker-highlight {
+    .scraping-ce-picker-highlight {
       outline: 2px solid #1a73e8 !important;
       background-color: rgba(26, 115, 232, 0.1) !important;
     }
-    body.picker-active * {
+    body.scraping-ce-picker-active * {
       cursor: crosshair !important;
     }
   `;
   document.head.appendChild(style);
-  document.body.classList.add('picker-active');
+  document.body.classList.add('scraping-ce-picker-active');
   
   // Add event listeners
   document.addEventListener('mouseover', handleMouseOver, true);
@@ -148,13 +148,13 @@ function disablePicker() {
   document.body.style.cursor = 'default';
   document.removeEventListener('mouseover', handleMouseOver, true);
   document.removeEventListener('click', handleElementClick, true);
-  document.body.classList.remove('picker-active');
+  document.body.classList.remove('scraping-ce-picker-active');
   
-  const style = document.getElementById('picker-styles');
+  const style = document.getElementById('scraping-ce-picker-styles');
   if (style) style.remove();
   
   if (previouslyHighlighted) {
-    previouslyHighlighted.classList.remove('picker-highlight');
+    previouslyHighlighted.classList.remove('scraping-ce-picker-highlight');
     previouslyHighlighted = null;
   }
 }
@@ -168,10 +168,10 @@ function handleMouseOver(event) {
   const element = event.target;
   
   if (previouslyHighlighted && previouslyHighlighted !== element) {
-    previouslyHighlighted.classList.remove('picker-highlight');
+    previouslyHighlighted.classList.remove('scraping-ce-picker-highlight');
   }
   
-  element.classList.add('picker-highlight');
+  element.classList.add('scraping-ce-picker-highlight');
   previouslyHighlighted = element;
 }
 
@@ -209,7 +209,7 @@ function generateSelector(element) {
   // 2. If element has useful classes, use them
   if (element.className) {
     const classes = element.className.split(' ')
-      .filter(c => c && !c.match(/^(active|selected|hover|disabled|loading)/))
+      .filter(c => c && !c.match(/^(active|selected|hover|disabled|loading|scraping-ce-picker)/))
       .slice(0, 2);
     
     if (classes.length > 0) {
@@ -235,7 +235,11 @@ function generateSelector(element) {
       path.unshift(selector);
       break;
     } else if (current.className) {
-      const classes = current.className.split(' ').slice(0, 1).join('.');
+      // Filter out picker classes here too
+      const classes = current.className.split(' ')
+        .filter(c => !c.match(/^scraping-ce-picker/))
+        .slice(0, 1)
+        .join('.');
       if (classes) selector += '.' + classes;
     }
     

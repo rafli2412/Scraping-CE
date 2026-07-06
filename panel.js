@@ -1,10 +1,13 @@
+// ============================================
+// DEVTOOLS PANEL - Main Scraper Interface
+// ============================================
+
 // State management
 let selectors = [];
 let scrapedData = [];
+let pickerActive = false;
 
 // DOM Elements
-const targetUrlInput = document.getElementById('targetUrl');
-const openPageBtn = document.getElementById('openPageBtn');
 const fieldNameInput = document.getElementById('fieldName');
 const cssSelectorInput = document.getElementById('cssSelector');
 const addSelectorBtn = document.getElementById('addSelectorBtn');
@@ -29,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function attachEventListeners() {
-  openPageBtn.addEventListener('click', openTargetUrl);
   addSelectorBtn.addEventListener('click', addSelector);
   togglePickerBtn.addEventListener('click', togglePicker);
   scrapeBtn.addEventListener('click', scrapeData);
@@ -37,31 +39,9 @@ function attachEventListeners() {
   exportXlsxBtn.addEventListener('click', exportXLSX);
   clearDataBtn.addEventListener('click', clearData);
   
-  // Enter key for selector inputs
   cssSelectorInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') addSelector();
   });
-}
-
-// ============================================
-// URL MANAGEMENT
-// ============================================
-
-function openTargetUrl() {
-  const url = targetUrlInput.value.trim();
-  if (!url) {
-    showStatus('Please enter a URL', 'error');
-    return;
-  }
-  
-  // Ensure URL has protocol
-  let fullUrl = url;
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    fullUrl = 'https://' + url;
-  }
-  
-  chrome.tabs.create({ url: fullUrl });
-  showStatus('Opening page...', 'info');
 }
 
 // ============================================
@@ -73,13 +53,12 @@ function addSelector() {
   const cssSelector = cssSelectorInput.value.trim();
   
   if (!fieldName || !cssSelector) {
-    showStatus('Please fill in both field name and CSS selector', 'error');
+    showStatus('⚠️ Please fill in both field name and CSS selector', 'error');
     return;
   }
   
-  // Check for duplicates
   if (selectors.some(s => s.fieldName === fieldName)) {
-    showStatus('Field name already exists', 'error');
+    showStatus('⚠️ Field name already exists', 'error');
     return;
   }
   
@@ -87,18 +66,18 @@ function addSelector() {
   saveState();
   renderSelectors();
   
-  // Clear inputs
   fieldNameInput.value = '';
   cssSelectorInput.value = '';
+  fieldNameInput.focus();
   
-  showStatus(`Added "${fieldName}"`, 'success');
+  showStatus(`✓ Added "${fieldName}"`, 'success');
 }
 
 function removeSelector(fieldName) {
   selectors = selectors.filter(s => s.fieldName !== fieldName);
   saveState();
   renderSelectors();
-  showStatus('Selector removed', 'success');
+  showStatus('✓ Selector removed', 'success');
 }
 
 function renderSelectors() {
@@ -107,51 +86,78 @@ function renderSelectors() {
     return;
   }
   
-  selectorsList.innerHTML = selectors.map(selector => `
+  selectorsList.innerHTML = selectors.map((selector, index) => `
     <li>
       <div class="selector-item">
         <div class="selector-field">${selector.fieldName}</div>
         <div class="selector-css">${selector.cssSelector}</div>
       </div>
-      <button class="remove-btn" onclick="removeSelector('${selector.fieldName}')">Remove</button>
+      <button class="remove-btn" data-index="${index}">✕</button>
     </li>
   `).join('');
+  
+  // Add event listeners to all remove buttons
+  document.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const index = parseInt(btn.getAttribute('data-index'));
+      if (index >= 0 && index < selectors.length) {
+        removeSelector(selectors[index].fieldName);
+      }
+    });
+  });
 }
 
 // ============================================
-// VISUAL PICKER MODE
+// VISUAL PICKER
 // ============================================
 
 function togglePicker() {
-  // Open standalone picker window
-  chrome.windows.create({
-    url: chrome.runtime.getURL('picker.html'),
-    type: 'popup',
-    width: 550,
-    height: 650,
-    left: 100,
-    top: 100
-  });
+  pickerActive = !pickerActive;
   
-  showStatus('🎯 Picker window opened! Use it to select elements.', 'info');
+  if (pickerActive) {
+    togglePickerBtn.classList.add('active');
+    togglePickerBtn.textContent = '🎯 Picking... (click element)';
+    pickerHint.style.display = 'block';
+    showStatus('🎯 Picker active - click an element on the webpage', 'info');
+    
+    // Get the current inspected page
+    const pageTabId = chrome.devtools.inspectedWindow.tabId;
+    
+    // Send message to content script
+    chrome.tabs.sendMessage(pageTabId, { action: 'startPicker' }, (response) => {
+      if (chrome.runtime.lastError) {
+        showStatus('❌ Cannot access this page', 'error');
+        pickerActive = false;
+        togglePickerBtn.classList.remove('active');
+        togglePickerBtn.textContent = '🎯 Pick Element on Page';
+        pickerHint.style.display = 'none';
+      }
+    });
+  } else {
+    disablePicker();
+  }
 }
 
-// Listen for picker messages from picker window
+function disablePicker() {
+  pickerActive = false;
+  togglePickerBtn.classList.remove('active');
+  togglePickerBtn.textContent = '🎯 Pick Element on Page';
+  pickerHint.style.display = 'none';
+  
+  const pageTabId = chrome.devtools.inspectedWindow.tabId;
+  chrome.tabs.sendMessage(pageTabId, { action: 'stopPicker' }).catch(() => {});
+}
+
+// Listen for messages from content script (picker)
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'pickedElement') {
     fieldNameInput.value = request.fieldName || 'Field ' + (selectors.length + 1);
     cssSelectorInput.value = request.selector;
-    pickerMode = false;
-    showStatus('Element picked! Review and add selector.', 'success');
-    sendResponse({ success: true });
-  } else if (request.action === 'addPickedSelector') {
-    fieldNameInput.value = request.fieldName;
-    cssSelectorInput.value = request.selector;
-    // Auto-add the selector
-    setTimeout(() => {
-      addSelector();
-    }, 100);
-    sendResponse({ success: true });
+    disablePicker();
+    showStatus('✓ Element picked! Review and add selector.', 'success');
+    fieldNameInput.focus();
   }
 });
 
@@ -161,32 +167,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 function scrapeData() {
   if (selectors.length === 0) {
-    showStatus('Please add at least one selector', 'error');
+    showStatus('⚠️ Please add at least one selector', 'error');
     return;
   }
   
   scrapeBtn.disabled = true;
-  scrapeBtn.textContent = 'Scraping...';
+  scrapeBtn.textContent = '⏳ Scraping...';
   
-  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    chrome.tabs.sendMessage(
-      tabs[0].id,
-      { action: 'scrape', selectors: selectors },
-      (response) => {
-        scrapeBtn.disabled = false;
-        scrapeBtn.textContent = 'Scrape Data';
-        
-        if (response && response.success) {
-          scrapedData = response.data;
-          saveState();
-          renderPreview();
-          showStatus(`Scraped ${scrapedData.length} items`, 'success');
-        } else {
-          showStatus('Scraping failed. Check selectors and try again.', 'error');
-        }
+  const pageTabId = chrome.devtools.inspectedWindow.tabId;
+  
+  chrome.tabs.sendMessage(
+    pageTabId,
+    { action: 'scrape', selectors: selectors },
+    (response) => {
+      scrapeBtn.disabled = false;
+      scrapeBtn.textContent = 'Start Scraping';
+      
+      if (response && response.success) {
+        scrapedData = response.data;
+        saveState();
+        renderPreview();
+        showStatus(`✓ Scraped ${scrapedData.length} items`, 'success');
+      } else {
+        showStatus('❌ Scraping failed. Check selectors and try again.', 'error');
       }
-    );
-  });
+    }
+  );
 }
 
 function renderPreview() {
@@ -211,7 +217,7 @@ function renderPreview() {
   `).join('');
   
   if (scrapedData.length > maxPreview) {
-    html += `<p style="color: #5f6368; font-size: 11px;">... and ${scrapedData.length - maxPreview} more items</p>`;
+    html += `<p style="color: #5f6368; font-size: 11px; margin: 8px 0 0 0;">... and ${scrapedData.length - maxPreview} more items</p>`;
   }
   
   previewContainer.innerHTML = html;
@@ -227,24 +233,22 @@ function truncate(str, length) {
 
 function exportJSON() {
   if (scrapedData.length === 0) {
-    showStatus('No data to export', 'error');
+    showStatus('⚠️ No data to export', 'error');
     return;
   }
   
   const jsonStr = JSON.stringify(scrapedData, null, 2);
   downloadFile(jsonStr, 'scraped-data.json', 'application/json');
-  showStatus('Exported as JSON', 'success');
+  showStatus('✓ Exported as JSON', 'success');
 }
 
 function exportXLSX() {
   if (scrapedData.length === 0) {
-    showStatus('No data to export', 'error');
+    showStatus('⚠️ No data to export', 'error');
     return;
   }
   
-  // For now, show a message. We'll integrate SheetJS next
-  showStatus('XLSX export coming soon! (Install SheetJS library)', 'info');
-  
+  showStatus('🔄 XLSX export coming soon! (SheetJS integration)', 'info');
   // TODO: Implement with SheetJS library
 }
 
@@ -269,25 +273,21 @@ function clearData() {
     scrapedData = [];
     saveState();
     renderPreview();
-    showStatus('Data cleared', 'success');
+    showStatus('✓ Data cleared', 'success');
   }
 }
 
 function saveState() {
   chrome.storage.local.set({
     selectors: selectors,
-    scrapedData: scrapedData,
-    targetUrl: targetUrlInput.value
+    scrapedData: scrapedData
   });
 }
 
 function loadState() {
-  chrome.storage.local.get(['selectors', 'scrapedData', 'targetUrl'], (result) => {
+  chrome.storage.local.get(['selectors', 'scrapedData'], (result) => {
     selectors = result.selectors || [];
     scrapedData = result.scrapedData || [];
-    if (result.targetUrl) {
-      targetUrlInput.value = result.targetUrl;
-    }
     renderSelectors();
     renderPreview();
   });
@@ -303,5 +303,5 @@ function showStatus(message, type) {
   
   setTimeout(() => {
     statusMessage.classList.remove('show');
-  }, 3000);
+  }, 3500);
 }

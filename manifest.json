@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Web Data Scraper",
+  "name": "Scraping CE",
   "version": "1.0.0",
-  "description": "Scrape data from websites using CSS selectors and export as JSON/XLSX",
+  "description": "DevTools-based web scraper with visual element picker.",
   
   "permissions": [
     "storage",
@@ -14,10 +14,7 @@
     "<all_urls>"
   ],
   
-  "action": {
-    "default_popup": "popup.html",
-    "default_title": "Web Data Scraper"
-  },
+  "devtools_page": "devtools.html",
   
   "background": {
     "service_worker": "background.js"
@@ -31,3 +28,4 @@
     }
   ]
 }
+
